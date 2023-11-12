@@ -18,7 +18,7 @@ depotdownloaderversion="2.5.0"
 depotdownloaderhash="462442ad9973c6482be6a1a0af3aee60"
 unityversion="2022.3.12f1"
 unityhash="4fe6e059c7ef"
-variant="macos_x64_player_nondevelopment_mono"
+variant="macos_arm64_player_nondevelopment_mono"
 steamworksversion="20.2.0"
 steamworkshash="6c8e7f5101176ed13d32cf704a4febe6"
 playfabpartyversion="1.7.16"
@@ -157,6 +157,25 @@ cp vendor/depots/$depotid/$buildid/valheim_Data/Plugins/Steamworks.NET.txt $pref
 cp -r vendor/Steamworks.NET-Standalone_$steamworksversion/OSX-Linux-x64/steam_api.bundle $prefix/Plugins/
 
 cp -r "vendor/PlayFabParty-for-macOS_v$playfabpartyversion/PlayFabParty-for-macOS/PlayFabPartyMacOS.bundle" $prefix/Plugins/party.bundle
+
+# Patch UnityPlayer to support OpenGL for arm64 (Apple Silicon)
+#
+# In Unity's SelectRenderingApi for arm64 there seems to be some logic that
+# enforces Metal (0x10) and disregards OpenGL (0x11). The following assembly
+# instruction is a fallback that ultimately sets graphics to None (0x4):
+#
+# > 89008052   mov     w9, #0x4
+#
+# By patching this instruction from None (0x4) to OpenGL (0x11) we enforce OpenGL.
+#
+# TODO: Will only work for this _exact_ UnityPlayer.dylib file, so should probably
+# verify against $unityhash and $variant (x64arm64_nondevelopment)
+#
+printf "\x29\x02" | dd of="$prefix/Frameworks/UnityPlayer.dylib" bs=1 seek=7228588 conv=notrunc
+
+# As UnityPlayer's code has been modified, re-sign with an ad-hoc identity
+# TODO: What kind of restrictions does this entail? No longer distributable?
+codesign --force --sign - $prefix/Frameworks/UnityPlayer.dylib
 
 rm -rf $prefix/Resources/Data/Plugins
 rm -rf $prefix/Resources/Data/MonoBleedingEdge
